@@ -88,17 +88,6 @@ sudo ./hy2-manager.sh
 - 💡 [功能建议](https://github.com/sindricn/s-hy2/issues/new?template=feature_request.md)
 
 
-## 赞助支持
-
-如果这个项目对你有帮助，可以请作者喝杯咖啡 ☕
-
-<div align="center">
-
-<img src="zanzhu.jpg" alt="赞助二维码" width="200">
-
-*扫码支持项目发展*
-
-</div>
 
 ## 致谢
 
