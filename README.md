@@ -21,7 +21,7 @@
 
 ### 一键安装
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sindricn/s-hy2/main/quick-install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/Xiaofei-Z/s-hy2/main/quick-install.sh | sudo bash
 sudo s-hy2
 ```
 
