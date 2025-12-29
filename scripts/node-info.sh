@@ -94,6 +94,40 @@ get_port_hopping_info() {
     fi
 }
 
+parse_hysteria2_link() {
+    local link="$1"
+    local base query fragment
+    local no_scheme="${link#hysteria2://}"
+    fragment="${no_scheme%%#*}"
+    if [[ "$no_scheme" == *\?* ]]; then
+        base="${fragment%%\?*}"
+        query="${fragment#*\?}"
+    else
+        base="$fragment"
+        query=""
+    fi
+    local link_password="${base%%@*}"
+    local hostport="${base#*@}"
+    local link_host="${hostport%%:*}"
+    local link_port="${hostport##*:}"
+    local link_sni=""
+    local link_obfs_password=""
+    local link_insecure=""
+    IFS='&' read -ra pairs <<< "$query"
+    for kv in "${pairs[@]}"; do
+        local key="${kv%%=*}"
+        local val="${kv#*=}"
+        if [[ "$key" == "sni" ]]; then
+            link_sni="$val"
+        elif [[ "$key" == "obfs-password" ]]; then
+            link_obfs_password="$val"
+        elif [[ "$key" == "insecure" || "$key" == "allowInsecure" ]]; then
+            link_insecure="$val"
+        fi
+    done
+    echo "$link_password|$link_host|$link_port|${link_sni}|${link_obfs_password}|${link_insecure}"
+}
+
 # 生成节点链接
 generate_node_link() {
     local server_ip="$1"
@@ -550,6 +584,29 @@ generate_subscription_files() {
     local obfs_password="$5"
     local sni_domain="$6"
     local insecure="$7"
+    if [[ -n "$node_link" ]]; then
+        local parsed
+        parsed=$(parse_hysteria2_link "$node_link")
+        IFS='|' read -r p_password p_host p_port p_sni p_obfs p_insec <<< "$parsed"
+        if [[ -n "$p_host" ]]; then
+            server_address="$p_host"
+        fi
+        if [[ -n "$p_port" ]]; then
+            port="$p_port"
+        fi
+        if [[ -n "$p_password" ]]; then
+            auth_password="$p_password"
+        fi
+        if [[ -n "$p_obfs" ]]; then
+            obfs_password="$p_obfs"
+        fi
+        if [[ -n "$p_sni" ]]; then
+            sni_domain="$p_sni"
+        fi
+        if [[ -n "$p_insec" ]]; then
+            insecure="true"
+        fi
+    fi
     
     local server_ip=$(get_current_server_ip)
     local configured_domain=$(get_server_domain)
