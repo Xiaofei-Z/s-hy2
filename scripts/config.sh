@@ -504,6 +504,22 @@ clear_port_hopping_rules() {
     if [[ -f "/etc/hysteria/port-hopping.conf" ]]; then
         source /etc/hysteria/port-hopping.conf 2>/dev/null
         if [[ -n "$IPTABLES_RULE" ]]; then
+            # 尝试移除防火墙规则 (如果有记录端口范围)
+            if [[ -n "$START_PORT" && -n "$END_PORT" ]]; then
+                echo -e "${BLUE}正在清理防火墙规则...${NC}"
+                if command -v firewall-cmd &>/dev/null && systemctl is-active --quiet firewalld; then
+                    firewall-cmd --remove-port=${START_PORT}-${END_PORT}/udp --permanent &>/dev/null
+                    firewall-cmd --reload &>/dev/null
+                    echo "Firewalld: 已移除端口范围 ${START_PORT}-${END_PORT}/udp"
+                elif command -v ufw &>/dev/null && ufw status | grep -q "Status: active"; then
+                    ufw delete allow ${START_PORT}:${END_PORT}/udp &>/dev/null
+                    echo "UFW: 已移除端口范围 ${START_PORT}:${END_PORT}/udp"
+                elif command -v iptables &>/dev/null; then
+                    iptables -D INPUT -p udp --dport ${START_PORT}:${END_PORT} -j ACCEPT 2>/dev/null
+                    echo "Iptables: 已移除 INPUT 端口范围 ${START_PORT}:${END_PORT}/udp"
+                fi
+            fi
+
             # 将 -A 替换为 -D 来删除规则
             local delete_rule="${IPTABLES_RULE/-A/-D}"
             if eval "$delete_rule" 2>/dev/null; then
@@ -660,6 +676,21 @@ add_port_hopping_rules() {
         echo -e "${GREEN}端口跳跃规则添加成功${NC}"
         echo "规则: $start_port-$end_port -> $target_port (接口: $interface)"
         
+        # 自动开放防火墙端口范围
+        echo -e "${BLUE}正在配置防火墙规则...${NC}"
+        if command -v firewall-cmd &>/dev/null && systemctl is-active --quiet firewalld; then
+            firewall-cmd --add-port=${start_port}-${end_port}/udp --permanent &>/dev/null
+            firewall-cmd --reload &>/dev/null
+            echo "Firewalld: 已开放端口范围 ${start_port}-${end_port}/udp"
+        elif command -v ufw &>/dev/null && ufw status | grep -q "Status: active"; then
+            ufw allow ${start_port}:${end_port}/udp &>/dev/null
+            echo "UFW: 已开放端口范围 ${start_port}:${end_port}/udp"
+        elif command -v iptables &>/dev/null; then
+            # 对于纯 iptables 环境，NAT PREROUTING 之前的 FILTER INPUT 需要允许
+            iptables -I INPUT -p udp --dport ${start_port}:${end_port} -j ACCEPT 2>/dev/null
+            echo "Iptables: 已允许 INPUT 端口范围 ${start_port}:${end_port}/udp"
+        fi
+
         # 保存配置到文件
         cat > "/etc/hysteria/port-hopping.conf" << EOF
 # 端口跳跃配置
