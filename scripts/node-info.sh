@@ -633,10 +633,7 @@ generate_subscription_files() {
     
     local sub_dir="/var/www/html/sub"
     local timestamp=$(date +%s)
-    # 生成更安全的UUID：时间戳+随机数，避免碰撞
-    local timestamp=$(date +%s%1000000)  # 最近7位时间戳
-    local random_part=$(openssl rand -hex 4)  # 8位随机数
-    local uuid="${timestamp}${random_part}"
+    local uuid=$(openssl rand -hex 8)
     
     # 创建订阅文件目录
     mkdir -p "$sub_dir"
@@ -649,28 +646,17 @@ generate_subscription_files() {
     local base64_sub="$sub_dir/base64-${uuid}.txt"
     
     # 1. Hysteria2 原生订阅格式
-    if ! echo "$node_link" > "$hysteria2_sub"; then
-        echo -e "${RED}错误：无法写入Hysteria2订阅文件${NC}"
-        return 1
-    fi
+    echo "$node_link" > "$hysteria2_sub"
     
     # 2. Base64编码订阅 (通用格式，兼容v2rayNG等客户端)
     # 直接对节点链接进行base64编码，不添加注释避免解析问题
-    local base64_encoded=$(echo "$node_link" | base64 -w 0 2>/dev/null)
-    if [[ $? -ne 0 || -z "$base64_encoded" ]]; then
-        echo -e "${RED}错误：Base64编码失败${NC}"
-        return 1
-    fi
-    if ! echo "$base64_encoded" > "$base64_sub"; then
-        echo -e "${RED}错误：无法写入Base64订阅文件${NC}"
-        return 1
-    fi
+    echo "$node_link" | base64 -w 0 > "$base64_sub"
     
     # 获取端口跳跃信息
     local port_hopping=$(get_port_hopping_info)
     
     # 3. Clash订阅格式
-    if ! cat > "$clash_sub" << EOF
+    cat > "$clash_sub" << EOF
 # Clash 订阅配置
 # 更新时间: $(date)
 proxies:
@@ -678,7 +664,7 @@ proxies:
     type: hysteria2
     server: $server_address
     port: $port
-    password: "$(echo "$auth_password" | sed 's/"/\\"/g')"
+    password: $auth_password
 EOF
     
     # 添加端口跳跃配置 
@@ -695,13 +681,13 @@ EOF
     if [[ -n "$obfs_password" ]]; then
         cat >> "$clash_sub" << EOF
     obfs: salamander
-    obfs-password: "$(echo "$obfs_password" | sed 's/"/\\"/g')"
+    obfs-password: "$obfs_password"
 EOF
     fi
     
     if [[ -n "$sni_domain" ]]; then
         cat >> "$clash_sub" << EOF
-    sni: "$(echo "$sni_domain" | sed 's/"/\\"/g')"
+    sni: $sni_domain
 EOF
     fi
     
@@ -790,7 +776,7 @@ rules:
 EOF
     
     # 4. SingBox订阅格式（移动端兼容）
-    if ! cat > "$singbox_sub" << EOF
+    cat > "$singbox_sub" << EOF
 {
   "dns": {
     "rules": [
@@ -870,16 +856,16 @@ EOF
     {
       "type": "hysteria2",
       "tag": "Hysteria2-Server",
-      "server": "$(echo "$server_address" | sed 's/"/\\"/g')",
+      "server": "$server_address",
       "server_port": $port,
-      "password": "$(echo "$auth_password" | sed 's/"/\\"/g')",
+      "password": "$auth_password",
 EOF
     
     if [[ -n "$obfs_password" ]]; then
         cat >> "$singbox_sub" << EOF
       "obfs": {
         "type": "salamander",
-        "password": "$(echo "$obfs_password" | sed 's/"/\\"/g')"
+        "password": "$obfs_password"
       },
 EOF
     fi
@@ -891,7 +877,7 @@ EOF
     
     if [[ -n "$sni_domain" ]]; then
         cat >> "$singbox_sub" << EOF
-        "server_name": "$(echo "$sni_domain" | sed 's/"/\\"/g')",
+        "server_name": "$sni_domain",
 EOF
     fi
     
@@ -964,7 +950,7 @@ EOF
 EOF
     
     # 5. SingBox PC端配置（带inbounds）
-    if ! cat > "$singbox_pc_sub" << EOF
+    cat > "$singbox_pc_sub" << EOF
 {
   "dns": {
     "rules": [
@@ -1051,16 +1037,16 @@ EOF
     {
       "type": "hysteria2",
       "tag": "Hysteria2-Server",
-      "server": "$(echo "$server_address" | sed 's/"/\\"/g')",
+      "server": "$server_address",
       "server_port": $port,
-      "password": "$(echo "$auth_password" | sed 's/"/\\"/g')",
+      "password": "$auth_password",
 EOF
     
     if [[ -n "$obfs_password" ]]; then
         cat >> "$singbox_pc_sub" << EOF
       "obfs": {
         "type": "salamander",
-        "password": "$(echo "$obfs_password" | sed 's/"/\\"/g')"
+        "password": "$obfs_password"
       },
 EOF
     fi
@@ -1072,7 +1058,7 @@ EOF
     
     if [[ -n "$sni_domain" ]]; then
         cat >> "$singbox_pc_sub" << EOF
-        "server_name": "$(echo "$sni_domain" | sed 's/"/\\"/g')",
+        "server_name": "$sni_domain",
 EOF
     fi
     
@@ -1144,24 +1130,8 @@ EOF
 }
 EOF
     
-    # 设置文件权限并验证
-    local permission_failed=false
-    for file in "$hysteria2_sub" "$clash_sub" "$singbox_sub" "$singbox_pc_sub" "$base64_sub"; do
-        if [[ ! -f "$file" ]]; then
-            echo -e "${RED}错误：订阅文件不存在 - $file${NC}"
-            permission_failed=true
-            continue
-        fi
-        if ! chmod 644 "$file" 2>/dev/null; then
-            echo -e "${RED}错误：无法设置文件权限 - $file${NC}"
-            permission_failed=true
-        fi
-    done
-    
-    if $permission_failed; then
-        echo -e "${RED}订阅文件权限设置失败，请检查文件系统权限${NC}"
-        return 1
-    fi
+    # 设置文件权限
+    chmod 644 "$hysteria2_sub" "$clash_sub" "$singbox_sub" "$singbox_pc_sub" "$base64_sub"
     
     # 检查 nginx 或 apache 是否安装，如果没有则提示安装
     if ! command -v nginx &>/dev/null && ! command -v apache2 &>/dev/null && ! command -v httpd &>/dev/null; then
