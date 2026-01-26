@@ -1182,6 +1182,67 @@ EOF
             echo ""
         fi
     fi
+
+    # 自动配置 Nginx 和防火墙 (如果检测到 Nginx)
+    if command -v nginx &>/dev/null; then
+        # 1. 配置 Nginx 虚拟主机
+        local nginx_conf_dir="/etc/nginx/conf.d"
+        local nginx_sites_dir="/etc/nginx/sites-enabled"
+        local conf_file=""
+        
+        if [[ -d "$nginx_conf_dir" ]]; then
+            conf_file="$nginx_conf_dir/s-hy2-sub.conf"
+        elif [[ -d "$nginx_sites_dir" ]]; then
+            conf_file="$nginx_sites_dir/s-hy2-sub"
+        fi
+        
+        # 如果确定了路径且文件不存在，则创建
+        if [[ -n "$conf_file" && ! -f "$conf_file" ]]; then
+            echo -e "${BLUE}正在配置 Nginx 订阅服务...${NC}"
+            cat > "$conf_file" << EOF
+server {
+    listen 80;
+    server_name _;
+    
+    location /sub {
+        alias $sub_dir;
+        index index.html;
+        autoindex on;
+        add_header Cache-Control no-store;
+        access_log off;
+    }
+}
+EOF
+            # 测试配置并重载
+            if nginx -t &>/dev/null; then
+                systemctl reload nginx &>/dev/null || systemctl restart nginx &>/dev/null
+                echo -e "${GREEN}Nginx 配置已更新${NC}"
+            else
+                echo -e "${YELLOW}警告: Nginx 配置测试失败，跳过自动配置${NC}"
+                rm -f "$conf_file"
+            fi
+        fi
+        
+        # 2. 检查防火墙并开放 80 端口
+        if command -v firewall-cmd &>/dev/null && systemctl is-active --quiet firewalld; then
+            if ! firewall-cmd --query-port=80/tcp &>/dev/null; then
+                echo -e "${BLUE}正在开放 80 端口 (firewalld)...${NC}"
+                firewall-cmd --add-port=80/tcp --permanent &>/dev/null
+                firewall-cmd --reload &>/dev/null
+            fi
+        elif command -v ufw &>/dev/null && ufw status | grep -q "Status: active"; then
+            if ! ufw status | grep -q "80/tcp"; then
+                echo -e "${BLUE}正在开放 80 端口 (ufw)...${NC}"
+                ufw allow 80/tcp &>/dev/null
+            fi
+        elif command -v iptables &>/dev/null; then
+            # 简单检查 iptables 规则
+            if ! iptables -C INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null; then
+                 echo -e "${BLUE}正在开放 80 端口 (iptables)...${NC}"
+                 iptables -I INPUT -p tcp --dport 80 -j ACCEPT &>/dev/null
+            fi
+        fi
+    fi
     
     # 生成订阅链接 (优先使用域名)
     local hysteria2_url="http://${server_host}/sub/hysteria2-${uuid}.txt"
