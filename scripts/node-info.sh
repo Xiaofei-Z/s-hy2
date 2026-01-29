@@ -631,12 +631,42 @@ generate_subscription_files() {
         echo -e "${YELLOW}使用服务器IP地址: $server_ip${NC}"
     fi
     
-    local sub_dir="/var/www/html/sub"
+    local sub_dir=""
+    if command -v nginx &>/dev/null; then
+        local nginx_root=""
+        if nginx -t &>/dev/null; then
+            nginx_root=$(nginx -T 2>/dev/null | awk '/server {/,/}/{if($1=="root"){print $2}}' | tr -d ';' | head -1)
+        fi
+        if [[ -z "$nginx_root" ]]; then
+            if [[ -d "/usr/share/nginx/html" ]]; then
+                nginx_root="/usr/share/nginx/html"
+            elif [[ -d "/var/www/html" ]]; then
+                nginx_root="/var/www/html"
+            else
+                nginx_root="/usr/share/nginx/html"
+            fi
+        fi
+        sub_dir="$nginx_root/sub"
+    elif command -v apache2 &>/dev/null || command -v httpd &>/dev/null; then
+        sub_dir="/var/www/html/sub"
+    else
+        sub_dir="/var/www/html/sub"
+    fi
     local timestamp=$(date +%s)
     local uuid=$(openssl rand -hex 8)
     
-    # 创建订阅文件目录
+    # 创建订阅文件目录并建立冗余目录/符号链接以避免不同发行版根目录差异
     mkdir -p "$sub_dir"
+    for alt_root in "/usr/share/nginx/html" "/var/www/html"; do
+        local alt_dir="$alt_root/sub"
+        if [[ "$alt_dir" != "$sub_dir" ]]; then
+            # 若备用目录不存在，则创建到父目录并建立符号链接指向实际目录
+            if [[ ! -d "$alt_dir" ]]; then
+                mkdir -p "$alt_root" 2>/dev/null || true
+                ln -s "$sub_dir" "$alt_dir" 2>/dev/null || true
+            fi
+        fi
+    done
     
     # 生成不同格式的订阅文件
     local hysteria2_sub="$sub_dir/hysteria2-${uuid}.txt"
@@ -651,7 +681,14 @@ generate_subscription_files() {
     # 2. Base64编码订阅 (通用格式，兼容v2rayNG等客户端)
     # 直接对节点链接进行base64编码，不添加注释避免解析问题
     echo "$node_link" | base64 -w 0 > "$base64_sub"
-    
+    for alt_root in "/usr/share/nginx/html" "/var/www/html"; do
+        alt_dir="$alt_root/sub"
+        if [[ "$alt_dir" != "$sub_dir" ]]; then
+            mkdir -p "$alt_dir" 2>/dev/null || true
+            cp -f "$hysteria2_sub" "$alt_dir/hysteria2-${uuid}.txt" 2>/dev/null || true
+            cp -f "$base64_sub" "$alt_dir/base64-${uuid}.txt" 2>/dev/null || true
+        fi
+    done
     # 获取端口跳跃信息
     local port_hopping=$(get_port_hopping_info)
     
@@ -774,7 +811,13 @@ rules:
   # 其他流量走代理
   - MATCH,🚀 节点选择
 EOF
-    
+    for alt_root in "/usr/share/nginx/html" "/var/www/html"; do
+        alt_dir="$alt_root/sub"
+        if [[ "$alt_dir" != "$sub_dir" ]]; then
+            mkdir -p "$alt_dir" 2>/dev/null || true
+            cp -f "$clash_sub" "$alt_dir/clash-${uuid}.yaml" 2>/dev/null || true
+        fi
+    done
     # 4. SingBox订阅格式（移动端兼容）
     cat > "$singbox_sub" << EOF
 {
@@ -948,7 +991,13 @@ EOF
   }
 }
 EOF
-    
+    for alt_root in "/usr/share/nginx/html" "/var/www/html"; do
+        alt_dir="$alt_root/sub"
+        if [[ "$alt_dir" != "$sub_dir" ]]; then
+            mkdir -p "$alt_dir" 2>/dev/null || true
+            cp -f "$singbox_sub" "$alt_dir/singbox-${uuid}.json" 2>/dev/null || true
+        fi
+    done
     # 5. SingBox PC端配置（带inbounds）
     cat > "$singbox_pc_sub" << EOF
 {
@@ -1129,7 +1178,13 @@ EOF
   }
 }
 EOF
-    
+    for alt_root in "/usr/share/nginx/html" "/var/www/html"; do
+        alt_dir="$alt_root/sub"
+        if [[ "$alt_dir" != "$sub_dir" ]]; then
+            mkdir -p "$alt_dir" 2>/dev/null || true
+            cp -f "$singbox_pc_sub" "$alt_dir/singbox-pc-${uuid}.json" 2>/dev/null || true
+        fi
+    done
     # 设置文件权限
     chmod 644 "$hysteria2_sub" "$clash_sub" "$singbox_sub" "$singbox_pc_sub" "$base64_sub"
     
@@ -1187,17 +1242,9 @@ EOF
     if command -v nginx &>/dev/null; then
         # 1. 配置 Nginx 虚拟主机
         local nginx_conf_dir="/etc/nginx/conf.d"
-        local nginx_sites_dir="/etc/nginx/sites-enabled"
-        local conf_file=""
-        
-        if [[ -d "$nginx_conf_dir" ]]; then
-            conf_file="$nginx_conf_dir/s-hy2-sub.conf"
-        elif [[ -d "$nginx_sites_dir" ]]; then
-            conf_file="$nginx_sites_dir/s-hy2-sub"
-        fi
-        
-        # 如果确定了路径且文件不存在，则创建
-        if [[ -n "$conf_file" && ! -f "$conf_file" ]]; then
+        local conf_file="$nginx_conf_dir/s-hy2-sub.conf"
+        mkdir -p "$nginx_conf_dir"
+        if [[ ! -f "$conf_file" ]]; then
             echo -e "${BLUE}正在配置 Nginx 订阅服务...${NC}"
             cat > "$conf_file" << EOF
 server {
