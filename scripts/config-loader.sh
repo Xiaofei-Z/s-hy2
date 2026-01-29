@@ -108,8 +108,8 @@ setup_default_config() {
     # 项目信息
     PROJECT_NAME=${PROJECT_NAME:-"s-hy2"}
     PROJECT_VERSION=${PROJECT_VERSION:-"1.1.2"}
-    PROJECT_REPO_URL=${PROJECT_REPO_URL:-"https://github.com/sindricn/s-hy2"}
-    PROJECT_RAW_URL=${PROJECT_RAW_URL:-"https://raw.githubusercontent.com/sindricn/s-hy2/main"}
+    PROJECT_REPO_URL=${PROJECT_REPO_URL:-"https://github.com/Xiaofei-Z/s-hy2"}
+    PROJECT_RAW_URL=${PROJECT_RAW_URL:-"https://raw.githubusercontent.com/Xiaofei-Z/s-hy2/main"}
 
     # 基本设置
     DEFAULT_LISTEN_PORT=${DEFAULT_LISTEN_PORT:-443}

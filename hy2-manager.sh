@@ -2433,7 +2433,7 @@ uninstall_everything() {
     echo -e "${BLUE}系统已完全清理，感谢使用 S-Hy2 管理脚本${NC}"
     echo ""
     echo -e "${YELLOW}重新安装:${NC}"
-    echo "curl -fsSL https://raw.githubusercontent.com/sindricn/s-hy2/main/quick-install.sh | sudo bash"
+2436→    echo "curl -fsSL https://raw.githubusercontent.com/Xiaofei-Z/s-hy2/main/quick-install.sh | sudo bash"
     echo ""
     
     # 由于脚本本身已被删除，这里直接退出
@@ -2503,7 +2503,7 @@ about_script() {
     echo "日志查看: journalctl -u hysteria-server"
     echo ""
     echo -e "${YELLOW}获取支持:${NC}"
-    echo "• GitHub: https://github.com/sindricn/s-hy2"
+2506→    echo "• GitHub: https://github.com/Xiaofei-Z/s-hy2"
     echo "• Issues: 在 GitHub 仓库提交问题"
     echo ""
     wait_for_user

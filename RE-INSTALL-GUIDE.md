@@ -98,7 +98,7 @@ sudo /root/fix-clash-subscription.sh
 ### 修复结果
 
 工具会自动：
-1. ✅ 检测当前服务器IP（47.79.243.217）
+1. ✅ 检测当前服务器IP（your-server-ip）
 2. ✅ 从配置文件读取真实密码
 3. ✅ 删除错误的订阅文件
 4. ✅ 生成新的订阅文件（使用正确的IP）
@@ -123,7 +123,7 @@ sudo /root/fix-clash-subscription.sh
 
 **示例链接格式**:
 ```
-hysteria2://EtcJB32NICh6KVCJ@47.79.243.217:443?insecure=1&obfs=salmander&obfs-password=6D3n3P1HKtzWNuhZ&sni=aws.amazon.com#Hysteria2-Server
+hysteria2://your-password@your-server-ip:443?insecure=1&obfs=salmander&obfs-password=your-obfs-password&sni=aws.amazon.com#Hysteria2-Server
 ```
 
 ---
@@ -137,7 +137,7 @@ hysteria2://EtcJB32NICh6KVCJ@47.79.243.217:443?insecure=1&obfs=salmander&obfs-pa
 
 #### Windows/Mac/Linux (Clash Verge Rev)
 
-1. 复制订阅链接: `http://47.79.243.217/sub/clash-xxx.yaml`
+1. 复制订阅链接: `http://your-server-ip/sub/clash-xxx.yaml`
 2. 导入到Clash
 3. 在节点配置中启用: `skip-cert-verify: true`
 4. 测试连接
@@ -147,11 +147,11 @@ hysteria2://EtcJB32NICh6KVCJ@47.79.243.217:443?insecure=1&obfs=salmander&obfs-pa
 proxies:
   - name: "S-Hy2-Server"
     type: hysteria2
-    server: 47.79.243.217
+    server: your-server-ip
     port: 443
-    password: EtcJB32NICh6KVCJ
+    password: your-password
     obfs: salamander
-    obfs-password: 6D3n3P1HKtzWNuhZ
+    obfs-password: your-obfs-password
     sni: aws.amazon.com
     skip-cert-verify: true  # 关键！
     alpn:
@@ -375,12 +375,12 @@ fastOpen:
 
 4. **上传修复工具**
    ```bash
-   scp fix-clash-subscription.sh root@47.79.243.217:/root/
+   scp fix-clash-subscription.sh root@your-server-ip:/root/
    ```
 
 5. **运行修复工具**
    ```bash
-   ssh root@47.79.243.217
+   ssh root@your-server-ip
    chmod +x /root/fix-clash-subscription.sh
    sudo /root/fix-clash-subscription.sh
    ```
