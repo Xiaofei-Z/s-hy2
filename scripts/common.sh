@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# 防止重复加载
+if [[ -n "${COMMON_SH_LOADED:-}" ]]; then
+    return 0
+fi
+readonly COMMON_SH_LOADED=true
+
 # 公共函数库 - 统一错误处理和日志记录
 # 为所有脚本提供标准化的错误处理、日志记录和工具函数
 

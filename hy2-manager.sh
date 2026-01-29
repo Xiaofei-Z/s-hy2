@@ -205,7 +205,7 @@ show_system_info() {
 get_system_info() {
     if [[ -f /etc/os-release ]]; then
         source /etc/os-release
-        echo "${PRETTY_NAME:-$NAME $VERSION_ID}"
+        echo "${PRETTY_NAME:-${NAME:-Linux} ${VERSION_ID:-}}"
     else
         echo "未知系统"
     fi
@@ -241,6 +241,7 @@ safe_source_script() {
         # shellcheck source=/dev/null
         source "$script_path" || {
             log_error "$script_name 加载失败"
+            wait_for_user
             return 1
         }
         return 0
@@ -251,6 +252,7 @@ safe_source_script() {
         echo "1. 重新运行安装脚本"
         echo "2. 检查脚本文件是否完整"
         echo ""
+        wait_for_user
         return 1
     fi
 }

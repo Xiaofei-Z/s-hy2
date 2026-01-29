@@ -4,14 +4,20 @@
 # 用于检查和更新 s-hy2 管理脚本及其组件
 
 # 引用公共函数库
-if [[ -f "$(dirname "${BASH_SOURCE[0]}")/common.sh" ]]; then
+if [[ -z "${LOG_INFO_DEFINED:-}" ]] && [[ -f "$(dirname "${BASH_SOURCE[0]}")/common.sh" ]]; then
     source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+    # 标记已加载
+    readonly LOG_INFO_DEFINED=true
 else
-    # 简单的日志函数回退
-    log_info() { echo -e "\033[0;34m[INFO]\033[0m $1"; }
-    log_success() { echo -e "\033[0;32m[SUCCESS]\033[0m $1"; }
-    log_warn() { echo -e "\033[1;33m[WARN]\033[0m $1"; }
-    log_error() { echo -e "\033[0;31m[ERROR]\033[0m $1"; }
+    # 如果 common.sh 已经被加载（通过 hy2-manager.sh），则不需要重新定义日志函数
+    # 但如果未加载且未找到文件，则定义回退函数
+    if [[ -z "${LOG_INFO_DEFINED:-}" ]]; then
+        # 简单的日志函数回退
+        log_info() { echo -e "\033[0;34m[INFO]\033[0m $1"; }
+        log_success() { echo -e "\033[0;32m[SUCCESS]\033[0m $1"; }
+        log_warn() { echo -e "\033[1;33m[WARN]\033[0m $1"; }
+        log_error() { echo -e "\033[0;31m[ERROR]\033[0m $1"; }
+    fi
 fi
 
 # 配置

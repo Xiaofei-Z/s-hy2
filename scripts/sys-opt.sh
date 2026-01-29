@@ -4,8 +4,10 @@
 # 用于 Hysteria 2 的系统内核参数优化 (BBR, Sysctl)
 
 # 引用公共函数库
-if [[ -f "$(dirname "${BASH_SOURCE[0]}")/common.sh" ]]; then
+if [[ -z "${LOG_INFO_DEFINED:-}" ]] && [[ -f "$(dirname "${BASH_SOURCE[0]}")/common.sh" ]]; then
     source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+    # 标记已加载
+    readonly LOG_INFO_DEFINED=true
 fi
 
 # Sysctl 配置文件路径
@@ -266,8 +268,12 @@ sys_optimization_menu() {
         echo -e "${YELLOW}当前状态:${NC}"
         # 简单显示当前关键指标
         local current_rmem
-        current_rmem=$(sysctl -n net.core.rmem_max 2>/dev/null)
-        echo "UDP缓冲区: $((current_rmem / 1024 / 1024))MB" 
+        current_rmem=$(sysctl -n net.core.rmem_max 2>/dev/null || echo "0")
+        if [[ "$current_rmem" == "0" ]]; then
+            echo "UDP缓冲区: 未知"
+        else
+            echo "UDP缓冲区: $((current_rmem / 1024 / 1024))MB" 
+        fi
         echo -n "BBR状态: "
         local bbr
         bbr=$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null)
