@@ -631,27 +631,7 @@ generate_subscription_files() {
         echo -e "${YELLOW}使用服务器IP地址: $server_ip${NC}"
     fi
     
-    local sub_dir=""
-    if command -v nginx &>/dev/null; then
-        local nginx_root=""
-        if nginx -t &>/dev/null; then
-            nginx_root=$(nginx -T 2>/dev/null | awk '/server {/,/}/{if($1=="root"){print $2}}' | tr -d ';' | head -1)
-        fi
-        if [[ -z "$nginx_root" ]]; then
-            if [[ -d "/usr/share/nginx/html" ]]; then
-                nginx_root="/usr/share/nginx/html"
-            elif [[ -d "/var/www/html" ]]; then
-                nginx_root="/var/www/html"
-            else
-                nginx_root="/usr/share/nginx/html"
-            fi
-        fi
-        sub_dir="$nginx_root/sub"
-    elif command -v apache2 &>/dev/null || command -v httpd &>/dev/null; then
-        sub_dir="/var/www/html/sub"
-    else
-        sub_dir="/var/www/html/sub"
-    fi
+    local sub_dir="/var/www/html/sub"
     local timestamp=$(date +%s)
     local uuid=$(openssl rand -hex 8)
     
@@ -1268,6 +1248,22 @@ EOF
                 echo -e "${YELLOW}警告: Nginx 配置测试失败，跳过自动配置${NC}"
                 rm -f "$conf_file"
             fi
+        fi
+        
+        # 1.1 调整默认站点根目录为 /var/www/html
+        mkdir -p /var/www/html
+        if [[ -f "/etc/nginx/sites-available/default" ]]; then
+            sed -i 's#root[[:space:]]\\+/usr/share/nginx/html;#root   /var/www/html;#g' /etc/nginx/sites-available/default 2>/dev/null || true
+            mkdir -p /etc/nginx/sites-enabled
+            ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default 2>/dev/null || true
+        elif [[ -f "/etc/nginx/nginx.conf" ]]; then
+            sed -i 's#root[[:space:]]\\+/usr/share/nginx/html;#root   /var/www/html;#g' /etc/nginx/nginx.conf 2>/dev/null || true
+        fi
+        if nginx -t &>/dev/null; then
+            systemctl reload nginx &>/dev/null || systemctl restart nginx &>/dev/null
+            echo -e "${GREEN}已将 Nginx 默认站点根目录设置为 /var/www/html${NC}"
+        else
+            echo -e "${YELLOW}警告: 修改默认站点根目录后配置测试失败，保持原配置${NC}"
         fi
         
         # 2. 检查防火墙并开放 80 端口
