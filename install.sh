@@ -229,6 +229,18 @@ server {
 EOF
     if [[ -f "/etc/nginx/sites-available/default" ]]; then
         sed -i 's#/usr/share/nginx/html#/var/www/html#g' /etc/nginx/sites-available/default 2>/dev/null || true
+        if ! grep -qE 'location[[:space:]]+/sub' /etc/nginx/sites-available/default; then
+            awk -v block="    location /sub {\n        alias /var/www/html/sub;\n        index index.html;\n        autoindex on;\n        add_header Cache-Control no-store;\n    }\n" '
+                /server[[:space:]]*\{/ {print; inserver=1; next}
+                inserver && /root[[:space:]]+/ && !added {print; print block; added=1; next}
+                {print}
+            ' /etc/nginx/sites-available/default > /etc/nginx/sites-available/default.tmp 2>/dev/null || true
+            if [[ -s /etc/nginx/sites-available/default.tmp ]]; then
+                mv /etc/nginx/sites-available/default.tmp /etc/nginx/sites-available/default
+            else
+                rm -f /etc/nginx/sites-available/default.tmp
+            fi
+        fi
         mkdir -p /etc/nginx/sites-enabled
         ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default 2>/dev/null || true
     elif [[ -f "/etc/nginx/nginx.conf" ]]; then

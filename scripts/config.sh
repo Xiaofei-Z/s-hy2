@@ -409,6 +409,64 @@ get_network_interface() {
     echo "$interface"
 }
 
+# 添加端口跳跃规则
+add_port_hopping_rules() {
+    local start_port=${1:-20000}
+    local end_port=${2:-50000}
+    local target_port=${3:-$(get_current_listen_port)}
+    local interface=$(get_network_interface)
+    
+    echo -e "${BLUE}正在配置端口跳跃规则 ($start_port-$end_port -> $target_port)...${NC}"
+    
+    # 检查是否已存在
+    if check_port_hopping_status >/dev/null 2>&1; then
+        echo -e "${YELLOW}端口跳跃规则已存在，跳过配置${NC}"
+        return 0
+    fi
+
+    # 添加 iptables 规则
+    local iptables_rule="iptables -t nat -A PREROUTING -i $interface -p udp --dport $start_port:$end_port -j REDIRECT --to-ports $target_port"
+    
+    if eval "$iptables_rule" 2>/dev/null; then
+        echo -e "${GREEN}iptables 规则添加成功${NC}"
+        
+        # 保存到配置文件以便持久化/清除
+        mkdir -p /etc/hysteria
+        cat > "/etc/hysteria/port-hopping.conf" << EOF
+START_PORT=$start_port
+END_PORT=$end_port
+TARGET_PORT=$target_port
+INTERFACE=$interface
+IPTABLES_RULE="$iptables_rule"
+EOF
+        
+        # 尝试持久化规则
+        if command -v netfilter-persistent &>/dev/null; then
+            netfilter-persistent save >/dev/null 2>&1
+        elif command -v service &>/dev/null && [ -f /etc/init.d/iptables ]; then
+            service iptables save >/dev/null 2>&1
+        fi
+        
+        # 开放防火墙端口
+        if command -v firewall-cmd &>/dev/null && systemctl is-active --quiet firewalld; then
+            firewall-cmd --add-port=${start_port}-${end_port}/udp --permanent >/dev/null 2>&1
+            firewall-cmd --reload >/dev/null 2>&1
+            echo "Firewalld: 已开放端口范围 ${start_port}-${end_port}/udp"
+        elif command -v ufw &>/dev/null && ufw status | grep -q "Status: active"; then
+            ufw allow ${start_port}:${end_port}/udp >/dev/null 2>&1
+            echo "UFW: 已开放端口范围 ${start_port}:${end_port}/udp"
+        elif command -v iptables &>/dev/null; then
+             iptables -I INPUT -p udp --dport ${start_port}:${end_port} -j ACCEPT 2>/dev/null
+             echo "Iptables: 已开放 INPUT 端口范围 ${start_port}:${end_port}/udp"
+        fi
+        
+        return 0
+    else
+        echo -e "${RED}添加端口跳跃规则失败${NC}"
+        return 1
+    fi
+}
+
 # 改进的端口跳跃状态检查
 check_port_hopping_status() {
     local interface=$(get_network_interface)

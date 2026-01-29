@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Hysteria2 配置管理脚本一键安装脚本
-# 使用方法: curl -fsSL https://raw.githubusercontent.com/sindricn/s-hy2/main/quick-install.sh | sudo bash
-# 调试模式: curl -fsSL https://raw.githubusercontent.com/sindricn/s-hy2/main/quick-install.sh | sudo bash -s -- --debug
+# 使用方法: curl -fsSL https://raw.githubusercontent.com/Xiaofei-Z/s-hy2/main/quick-install.sh | sudo bash
+# 调试模式: curl -fsSL https://raw.githubusercontent.com/Xiaofei-Z/s-hy2/main/quick-install.sh | sudo bash -s -- --debug
 
 # 检查是否启用调试模式
 if [[ "$1" == "--debug" ]]; then
@@ -43,8 +43,8 @@ log_error() {
 SCRIPT_NAME="s-hy2"
 INSTALL_DIR="/opt/$SCRIPT_NAME"
 BIN_DIR="/usr/local/bin"
-REPO_URL="https://github.com/sindricn/s-hy2"
-RAW_URL="https://raw.githubusercontent.com/sindricn/s-hy2/dev"
+REPO_URL="https://github.com/Xiaofei-Z/s-hy2"
+RAW_URL="https://raw.githubusercontent.com/Xiaofei-Z/s-hy2/main"
 
 # 打印标题
 print_header() {
