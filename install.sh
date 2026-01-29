@@ -193,12 +193,104 @@ verify_installation() {
     return 0
 }
 
+configure_web_server_and_subscription() {
+    local need_install_nginx=false
+    if ! command -v nginx &>/dev/null; then
+        need_install_nginx=true
+    fi
+    if $need_install_nginx; then
+        if command -v apt &>/dev/null; then
+            apt update -y >/dev/null 2>&1
+            apt install -y nginx >/dev/null 2>&1
+        elif command -v yum &>/dev/null; then
+            yum install -y nginx >/dev/null 2>&1
+        elif command -v dnf &>/dev/null; then
+            dnf install -y nginx >/dev/null 2>&1
+        fi
+        systemctl enable nginx >/dev/null 2>&1 || true
+        systemctl start nginx >/dev/null 2>&1 || true
+    fi
+    mkdir -p /var/www/html/sub
+    local nginx_conf_dir="/etc/nginx/conf.d"
+    local conf_file="$nginx_conf_dir/s-hy2-sub.conf"
+    mkdir -p "$nginx_conf_dir"
+    cat > "$conf_file" << EOF
+server {
+    listen 80;
+    server_name _;
+    location /sub {
+        alias /var/www/html/sub;
+        index index.html;
+        autoindex on;
+        add_header Cache-Control no-store;
+        access_log off;
+    }
+}
+EOF
+    if [[ -f "/etc/nginx/sites-available/default" ]]; then
+        sed -i 's#/usr/share/nginx/html#/var/www/html#g' /etc/nginx/sites-available/default 2>/dev/null || true
+        mkdir -p /etc/nginx/sites-enabled
+        ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default 2>/dev/null || true
+    elif [[ -f "/etc/nginx/nginx.conf" ]]; then
+        sed -i 's#/usr/share/nginx/html#/var/www/html#g' /etc/nginx/nginx.conf 2>/dev/null || true
+        if ! grep -q "/etc/nginx/conf.d/*.conf" /etc/nginx/nginx.conf; then
+            local tmp_conf="/etc/nginx/nginx.conf.tmp.$$"
+            awk '
+                BEGIN{added=0}
+                /http[[:space:]]*{/ {print; inhttp=1; next}
+                inhttp && /^}/ && !added {print "    include /etc/nginx/conf.d/*.conf;"; added=1; inhttp=0; print; next}
+                {print}
+            ' /etc/nginx/nginx.conf > "$tmp_conf" 2>/dev/null || true
+            if [[ -s "$tmp_conf" ]]; then
+                mv "$tmp_conf" /etc/nginx/nginx.conf
+            else
+                rm -f "$tmp_conf"
+            fi
+        fi
+    fi
+    nginx -t >/dev/null 2>&1 && systemctl reload nginx >/dev/null 2>&1 || systemctl restart nginx >/dev/null 2>&1
+    if command -v firewall-cmd &>/dev/null && systemctl is-active --quiet firewalld; then
+        firewall-cmd --add-port=80/tcp --permanent >/dev/null 2>&1 || true
+        firewall-cmd --reload >/dev/null 2>&1 || true
+    elif command -v ufw &>/dev/null && ufw status | grep -q "Status: active"; then
+        ufw allow 80/tcp >/dev/null 2>&1 || true
+    elif command -v iptables &>/dev/null; then
+        iptables -C INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport 80 -j ACCEPT >/dev/null 2>&1
+    fi
+    chown -R www-data:www-data /var/www/html 2>/dev/null || chown -R nginx:nginx /var/www/html 2>/dev/null || true
+    chmod -R 755 /var/www/html 2>/dev/null || true
+}
+
+ensure_systemd_restart_policy() {
+    local dropin_dir="/etc/systemd/system/hysteria-server.service.d"
+    local override_file="$dropin_dir/override.conf"
+    mkdir -p "$dropin_dir" 2>/dev/null || true
+    cat > "$override_file" << EOF
+[Service]
+Restart=always
+RestartSec=5
+LimitNOFILE=1048576
+EOF
+    systemctl daemon-reload >/dev/null 2>&1 || true
+}
+
+open_core_ports() {
+    local port_udp=443
+    if command -v firewall-cmd &>/dev/null && systemctl is-active --quiet firewalld; then
+        firewall-cmd --add-port=${port_udp}/udp --permanent >/dev/null 2>&1 || true
+        firewall-cmd --reload >/dev/null 2>&1 || true
+    elif command -v ufw &>/dev/null && ufw status | grep -q "Status: active"; then
+        ufw allow ${port_udp}/udp >/dev/null 2>&1 || true
+    elif command -v iptables &>/dev/null; then
+        iptables -C INPUT -p udp --dport ${port_udp} -j ACCEPT 2>/dev/null || iptables -I INPUT -p udp --dport ${port_udp} -j ACCEPT >/dev/null 2>&1
+    fi
+}
+
 # 显示安装后信息
 show_post_install_info() {
     echo ""
     echo -e "${CYAN}=== Hysteria2 安装完成 ===${NC}"
     echo ""
-    echo -e "${YELLOW}下一步操作:${NC}"
     echo "1. 配置 Hysteria2 服务"
     echo "   • 选择 '2. 一键快速配置' (推荐新用户)"
     echo "   • 或选择 '3. 手动配置' (高级用户)"
@@ -314,6 +406,9 @@ install_hysteria2() {
         create_config_directory
         configure_system_service
         verify_installation || install_success=false
+        configure_web_server_and_subscription
+        ensure_systemd_restart_policy
+        open_core_ports
     fi
     
     # 显示结果
