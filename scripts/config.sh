@@ -766,6 +766,9 @@ ask_restart_service() {
 
     if [[ ! $restart_service =~ ^[Nn]$ ]]; then
         echo -e "${BLUE}正在重启 Hysteria2 服务...${NC}"
+        # 确保 systemd 有重启策略，避免服务异常退出后不自动拉起
+        ensure_systemd_restart_policy
+        systemctl daemon-reload 2>/dev/null || true
         systemctl restart hysteria-server
 
         sleep 2
@@ -778,6 +781,18 @@ ask_restart_service() {
     else
         echo -e "${YELLOW}请稍后手动重启服务: systemctl restart hysteria-server${NC}"
     fi
+}
+
+ensure_systemd_restart_policy() {
+    local dropin_dir="/etc/systemd/system/hysteria-server.service.d"
+    local override_file="$dropin_dir/override.conf"
+    mkdir -p "$dropin_dir" 2>/dev/null || true
+    cat > "$override_file" << EOF
+[Service]
+Restart=always
+RestartSec=5
+LimitNOFILE=1048576
+EOF
 }
 
 # 一键快速配置

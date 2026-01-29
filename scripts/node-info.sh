@@ -1250,14 +1250,29 @@ EOF
             fi
         fi
         
-        # 1.1 调整默认站点根目录为 /var/www/html
+        # 1.1 调整默认站点根目录为 /var/www/html（稳健替换）
         mkdir -p /var/www/html
         if [[ -f "/etc/nginx/sites-available/default" ]]; then
-            sed -i 's#root[[:space:]]\\+/usr/share/nginx/html;#root   /var/www/html;#g' /etc/nginx/sites-available/default 2>/dev/null || true
+            sed -i 's#/usr/share/nginx/html#/var/www/html#g' /etc/nginx/sites-available/default 2>/dev/null || true
             mkdir -p /etc/nginx/sites-enabled
             ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default 2>/dev/null || true
         elif [[ -f "/etc/nginx/nginx.conf" ]]; then
-            sed -i 's#root[[:space:]]\\+/usr/share/nginx/html;#root   /var/www/html;#g' /etc/nginx/nginx.conf 2>/dev/null || true
+            sed -i 's#/usr/share/nginx/html#/var/www/html#g' /etc/nginx/nginx.conf 2>/dev/null || true
+        fi
+        # 1.2 确保 conf.d 被包含到 http 块
+        if [[ -f "/etc/nginx/nginx.conf" ]] && ! grep -q "/etc/nginx/conf.d/*.conf" /etc/nginx/nginx.conf; then
+            local tmp_conf="/etc/nginx/nginx.conf.tmp.$$"
+            awk '
+                BEGIN{added=0}
+                /http[[:space:]]*{/ {print; inhttp=1; next}
+                inhttp && /^}/ && !added {print "    include /etc/nginx/conf.d/*.conf;"; added=1; inhttp=0; print; next}
+                {print}
+            ' /etc/nginx/nginx.conf > "$tmp_conf" 2>/dev/null || true
+            if [[ -s "$tmp_conf" ]]; then
+                mv "$tmp_conf" /etc/nginx/nginx.conf
+            else
+                rm -f "$tmp_conf"
+            fi
         fi
         if nginx -t &>/dev/null; then
             systemctl reload nginx &>/dev/null || systemctl restart nginx &>/dev/null
