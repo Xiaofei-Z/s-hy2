@@ -114,6 +114,7 @@ check_script_integrity() {
         "service.sh"
         "domain-test.sh"
         "node-info.sh"
+        "sys-opt.sh"
     )
     
     for script in "${required_scripts[@]}"; do
@@ -158,9 +159,11 @@ print_menu() {
     echo -e "${CYAN}10.${NC} 防火墙管理"    # 新增
     echo -e "${GREEN}11.${NC} 卸载服务"
     echo -e "${GREEN}12.${NC} 关于脚本"
+    echo -e "${CYAN}13.${NC} 系统性能优化 (BBR)"
+    echo -e "${CYAN}14.${NC} 检查脚本更新"
     echo -e "${RED} 0.${NC} 退出"
     echo ""
-    echo -n -e "${BLUE}请输入选项 [0-12]: ${NC}"
+    echo -n -e "${BLUE}请输入选项 [0-14]: ${NC}"
 }
 
 # 检查 Hysteria2 是否已安装
@@ -2540,8 +2543,8 @@ main() {
         read -r choice
         
         # 输入验证
-        if ! validate_input "$choice" 0 12; then
-            log_error "请输入 0-12 之间的数字"
+        if ! validate_input "$choice" 0 14; then
+            log_error "请输入 0-14 之间的数字"
             sleep 2
             continue
         fi
@@ -2559,6 +2562,16 @@ main() {
             10) manage_firewall ;;
             11) uninstall_hysteria ;;
             12) about_script ;;
+            13)
+                if safe_source_script "$SCRIPTS_DIR/sys-opt.sh" "系统优化脚本"; then
+                    sys_optimization_menu
+                fi
+                ;;
+            14)
+                if safe_source_script "$SCRIPTS_DIR/update.sh" "更新模块"; then
+                    update_menu
+                fi
+                ;;
             0)
                 echo -e "${GREEN}感谢使用 Hysteria2 配置管理脚本!${NC}"
                 exit 0

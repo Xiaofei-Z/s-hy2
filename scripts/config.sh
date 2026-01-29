@@ -143,6 +143,26 @@ configure_acme_mode() {
         password=$(generate_password 16)
         echo -e "${GREEN}自动生成密码: $password${NC}"
     fi
+
+    # 询问总带宽限制 (用于拥塞控制)
+    echo ""
+    echo -e "${BLUE}服务器带宽配置 (单位: Mbps)${NC}"
+    echo "提示: 配置带宽有助于 Hysteria2 更好地进行拥塞控制 (Brutal算法)"
+    echo "如果不确定，请输入服务器的最大带宽 (默认 100)"
+    echo -n -e "${BLUE}上传带宽 (Mbps): ${NC}"
+    read -r up_mbps
+    up_mbps=${up_mbps:-100}
+    echo -n -e "${BLUE}下载带宽 (Mbps): ${NC}"
+    read -r down_mbps
+    down_mbps=${down_mbps:-100}
+    
+    local bandwidth_config=""
+    if [[ "$up_mbps" =~ ^[0-9]+$ ]] && [[ "$down_mbps" =~ ^[0-9]+$ ]]; then
+        bandwidth_config="
+bandwidth:
+  up: ${up_mbps} mbps
+  down: ${down_mbps} mbps"
+    fi
     
     # 询问是否启用混淆
     echo ""
@@ -202,7 +222,7 @@ obfs:
 # Hysteria2 配置文件 - ACME 模式
 # 生成时间: $(date)
 
-listen: :$listen_port
+listen: :$listen_port$bandwidth_config
 
 acme:
   domains:
@@ -296,6 +316,26 @@ configure_self_cert_mode() {
         password=$(generate_password 16)
         echo -e "${GREEN}自动生成密码: $password${NC}"
     fi
+
+    # 询问总带宽限制 (用于拥塞控制)
+    echo ""
+    echo -e "${BLUE}服务器带宽配置 (单位: Mbps)${NC}"
+    echo "提示: 配置带宽有助于 Hysteria2 更好地进行拥塞控制 (Brutal算法)"
+    echo "如果不确定，请输入服务器的最大带宽 (默认 100)"
+    echo -n -e "${BLUE}上传带宽 (Mbps): ${NC}"
+    read -r up_mbps
+    up_mbps=${up_mbps:-100}
+    echo -n -e "${BLUE}下载带宽 (Mbps): ${NC}"
+    read -r down_mbps
+    down_mbps=${down_mbps:-100}
+    
+    local bandwidth_config=""
+    if [[ "$up_mbps" =~ ^[0-9]+$ ]] && [[ "$down_mbps" =~ ^[0-9]+$ ]]; then
+        bandwidth_config="
+bandwidth:
+  up: ${up_mbps} mbps
+  down: ${down_mbps} mbps"
+    fi
     
     # 询问是否启用混淆
     echo ""
@@ -339,7 +379,7 @@ obfs:
 # Hysteria2 配置文件 - 自签名证书模式
 # 生成时间: $(date)
 
-listen: :$listen_port
+listen: :$listen_port$bandwidth_config
 
 tls:
   cert: /etc/hysteria/server.crt
@@ -909,8 +949,13 @@ quick_setup_hysteria() {
     local obfs_password=$(generate_password 16)
     echo "认证密码: $auth_password"
     echo "混淆密码: $obfs_password"
+    
+    # 4. 设置带宽 (一键模式默认 200Mbps，适合常见VPS)
+    local up_mbps=200
+    local down_mbps=200
+    echo "带宽设置: ${up_mbps}Mbps (上传/下载)"
 
-    # 4. 生成自签名证书
+    # 5. 生成自签名证书
     echo -e "${BLUE}步骤 4/7: 生成自签名证书...${NC}"
     mkdir -p /etc/hysteria
 
@@ -935,6 +980,10 @@ quick_setup_hysteria() {
 # 服务器IP: $server_ip
 
 listen: :443
+
+bandwidth:
+  up: ${up_mbps} mbps
+  down: ${down_mbps} mbps
 
 tls:
   cert: /etc/hysteria/server.crt
