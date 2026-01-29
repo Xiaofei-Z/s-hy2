@@ -110,11 +110,13 @@ check_script_integrity() {
     # 检查必需的脚本文件
     local required_scripts=(
         # "install.sh" (在根目录)
+        "common.sh"
         "config.sh"
         "service.sh"
         "domain-test.sh"
         "node-info.sh"
         "sys-opt.sh"
+        "update.sh"
     )
     
     for script in "${required_scripts[@]}"; do

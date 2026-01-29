@@ -174,6 +174,8 @@ download_scripts() {
         "performance-monitor.sh:性能监控模块"
         "performance-utils.sh:性能工具模块"
         "post-deploy-check.sh:部署后检查模块"
+        "sys-opt.sh:系统性能优化模块"
+        "update.sh:脚本更新模块"
     )
 
     for script_info in "${scripts[@]}"; do
