@@ -204,6 +204,56 @@ verify_optimization() {
     check_bbr_status
 }
 
+# 配置带宽
+configure_bandwidth() {
+    echo ""
+    log_info "配置服务器带宽限制..."
+    echo -e "${BLUE}配置带宽有助于 Hysteria2 更好地进行拥塞控制 (Brutal算法)${NC}"
+    echo -e "${YELLOW}请根据服务器实际带宽情况填写，填写 0 则不限制${NC}"
+    
+    echo -n -e "${BLUE}上传带宽 (Mbps) [默认: 100]: ${NC}"
+    read -r up_mbps
+    up_mbps=${up_mbps:-100}
+    
+    echo -n -e "${BLUE}下载带宽 (Mbps) [默认: 100]: ${NC}"
+    read -r down_mbps
+    down_mbps=${down_mbps:-100}
+    
+    if [[ "$up_mbps" =~ ^[0-9]+$ ]] && [[ "$down_mbps" =~ ^[0-9]+$ ]]; then
+        # 检查配置文件是否存在
+        local config_file="/etc/hysteria/config.yaml"
+        if [[ -f "$config_file" ]]; then
+            # 备份配置文件
+            cp "$config_file" "${config_file}.bak"
+            
+            # 检查是否已存在带宽配置
+            if grep -q "bandwidth:" "$config_file"; then
+                # 使用 sed 替换已有的带宽配置块
+                # 注意：这里假设带宽配置块格式标准，如果格式复杂可能需要更复杂的逻辑
+                sed -i '/bandwidth:/,+2d' "$config_file"
+            fi
+            
+            # 添加新的带宽配置
+            # 找到 listen: 行，在后面添加带宽配置
+            sed -i "/listen:/a bandwidth:\n  up: ${up_mbps} mbps\n  down: ${down_mbps} mbps" "$config_file"
+            
+            log_success "带宽配置已更新: 上传 ${up_mbps} Mbps, 下载 ${down_mbps} Mbps"
+            
+            # 询问是否重启服务
+            echo -n -e "${YELLOW}是否重启服务以应用更改? [Y/n]: ${NC}"
+            read -r restart
+            if [[ ! $restart =~ ^[Nn]$ ]]; then
+                systemctl restart hysteria-server
+                log_success "服务已重启"
+            fi
+        else
+            log_error "未找到配置文件: $config_file"
+        fi
+    else
+        log_error "带宽输入无效，请输入数字"
+    fi
+}
+
 # 系统优化菜单
 sys_optimization_menu() {
     while true; do
@@ -230,22 +280,28 @@ sys_optimization_menu() {
         echo ""
         echo -e "${YELLOW}优化选项:${NC}"
         echo -e "${GREEN}1.${NC} 执行全面优化 (推荐)"
-        echo -e "${GREEN}2.${NC} 仅开启 BBR"
-        echo -e "${GREEN}3.${NC} 仅优化 UDP 缓冲区"
-        echo -e "${GREEN}4.${NC} 验证优化结果"
+        echo -e "${GREEN}2.${NC} 配置带宽限制 (拥塞控制)"
+        echo -e "${GREEN}3.${NC} 仅开启 BBR"
+        echo -e "${GREEN}4.${NC} 仅优化 UDP 缓冲区"
+        echo -e "${GREEN}5.${NC} 验证优化结果"
         echo -e "${RED}0.${NC} 返回主菜单"
         echo ""
-        echo -n -e "${BLUE}请选择操作 [0-4]: ${NC}"
+        echo -n -e "${BLUE}请选择操作 [0-5]: ${NC}"
         read -r choice
         
         case $choice in
             1)
                 apply_sysctl_optimizations
                 optimize_ulimit
+                configure_bandwidth
                 verify_optimization
                 wait_for_user
                 ;;
             2)
+                configure_bandwidth
+                wait_for_user
+                ;;
+            3)
                 echo "正在开启 BBR..."
                 cat > /etc/sysctl.d/99-bbr.conf <<EOF
 net.core.default_qdisc = fq
@@ -255,7 +311,7 @@ EOF
                 check_bbr_status
                 wait_for_user
                 ;;
-            3)
+            4)
                 echo "正在优化 UDP 缓冲区..."
                 # 检测系统内存
                 local mem_total_kb
@@ -287,7 +343,7 @@ EOF
                 verify_optimization
                 wait_for_user
                 ;;
-            4)
+            5)
                 verify_optimization
                 wait_for_user
                 ;;
